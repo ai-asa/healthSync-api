@@ -1,0 +1,67 @@
+name: Claude PR Assistant
+
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude-code-action:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude PR Action
+        uses: ai-asa/claude-code-action@main
+        with:
+          use_oauth: true
+          claude_access_token: ${{ secrets.CLAUDE_ACCESS_TOKEN }}
+          claude_refresh_token: ${{ secrets.CLAUDE_REFRESH_TOKEN }}
+          claude_expires_at: ${{ secrets.CLAUDE_EXPIRES_AT }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+          # ---------- 指示書 ----------
+          custom_instructions: |
+            ultrathink
+            You are Claude Code inside a GitHub Action.
+            Interpret the first token of the comment as a command:
+
+            • `/ask`  – answer as a reply comment only. Do NOT modify the repo.
+
+            • `/dev`  – perform the requested implementation *or* documentation change.
+              ▸ If you modify executable code or configuration that affects behaviour,
+                - detect and run the repository’s test suite automatically
+                  (e.g. `npm test`, `pytest`, `go test`, `mvn test`, etc.).
+                - Push only when **all** tests pass.
+              ▸ If you changed *documentation only* (e.g. *.md, docs/**),
+                skip tests and commit directly.
+              ▸ After pushing, open a pull request that references the original comment.
+
+            After every command, post a short comment summarising what you did
+            (or why you could not comply).
+
+            --- USER COMMENT START ---
+            ${{ github.event.comment.body }}
+            --- USER COMMENT END ---
+
+          allowed_tools: "Comment,View,Bash,RunTests,GlobTool"
+          timeout_minutes: "30"

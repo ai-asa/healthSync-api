@@ -1,0 +1,58 @@
+name: Deploy LINE OAuth Worker
+
+# ❶ main へ push されたら本番デプロイ
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/api/line-oauth-worker/**'
+      - '.github/workflows/cloudflare-build.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  # ❷ 手動実行もできると便利
+  workflow_dispatch:
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    # 失敗しても 1 時間でタイムアウト
+    timeout-minutes: 60
+    # 同時実行の無駄撃ち防止
+    concurrency:
+      group: worker-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 20 系を使い、npm キャッシュを効かせる
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 任意：ESLint / unit test など.
+
+      - name: Debug ls
+        run: ls -R apps/api/line-oauth-worker
+
+      # ★ Cloudflare へデプロイ
+      - name: Build & Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: "4.16.1" 
+          workingDirectory: "apps/api/line-oauth-worker"
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          environment: production
+          secrets: |
+            LINE_CHANNEL_ID
+            LINE_CHANNEL_SECRET
+            LINE_CALLBACK_URL
+          command: deploy --minify
+        env:
+          LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CALLBACK_URL: ${{ secrets.LINE_CALLBACK_URL }}
