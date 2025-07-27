@@ -22,7 +22,7 @@
 | MVP3 | Measurementエンティティ | ✅ 完了 | 2025-07-27 |
 | MVP4 | 測定データ登録API（認証なし） | ✅ 完了 | 2025-07-27 |
 | MVP5 | JWT認証基盤 | ✅ 完了 | 2025-07-27 |
-| MVP6 | 認証付きAPI統合 | 🔲 未着手 | - |
+| MVP6 | 認証付きAPI統合 | ✅ 完了 | 2025-07-27 |
 | MVP7 | Docker/MySQL統合 | 🔲 未着手 | - |
 
 ## 詳細進捗
@@ -184,12 +184,32 @@ curl http://localhost:8000/health
 - email-validator依存関係の追加
 - Pydantic v2のjson_encoders警告を解消
 
-### 🔲 MVP6: 認証付きAPI統合
+### ✅ MVP6: 認証付きAPI統合
+
+**実装ファイル:**
+- `tests/unit/api/test_measurements_api.py` - 認証テストの追加（5ケース）
+- `src/api/v1/endpoints/measurements.py` - 認証依存関数の統合
+- `src/api/v1/dependencies/auth.py` - HTTPBearer401クラスの追加
+- `tests/integration/test_api_auth_integration.py` - 統合テスト（5テストケース）
 
 **チェックリスト:**
-- [ ] 認証ミドルウェア統合
-- [ ] 保護されたエンドポイント
-- [ ] 統合テスト
+- [x] 認証ミドルウェア統合
+- [x] 保護されたエンドポイント
+- [x] 統合テスト
+- [x] 401/403エラーハンドリング
+- [x] 既存テストの修正
+- [x] カバレッジ 92.45%
+
+**実装内容:**
+- 測定データAPIにJWT認証を統合
+- HTTPBearer401クラスで403→401に変換
+- 認証なし/無効トークン/期限切れのテスト
+- 統合テストでフルフローを検証
+- 既存テストに認証ヘッダーを追加
+
+**技術的対応:**
+- current_user.sub → current_user.user_idの修正
+- カスタムHTTPBearerクラスで401エラーに統一
 
 ### 🔲 MVP7: Docker/MySQL統合
 
@@ -225,6 +245,6 @@ make db-down                   # MySQL停止
 
 ## 次のアクション
 
-1. MVP6: 認証付きAPI統合
-2. 測定データAPIに認証を適用
-3. 統合テストの作成
+1. MVP7: Docker/MySQL統合
+2. MySQLコンテナのセットアップ
+3. データベース接続とマイグレーション

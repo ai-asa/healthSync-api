@@ -11,96 +11,74 @@ iOS HealthKitと連携し、ヘルスケアデータを収集・分析・可視�
 
 ## 2. ディレクトリ構成と責務範囲
 
+### 現在の実装済み構成（MVP1-6完了時点）
+
 ```
 healthsync-api/
 ├── src/                        # アプリケーションソースコード
 │   ├── api/                    # APIレイヤー（FastAPI）
-│   │   ├── v1/                 # APIバージョン1
-│   │   │   ├── endpoints/      # エンドポイント定義
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── measurements.py    # 測定データAPI
-│   │   │   │   ├── goals.py          # ゴール設定API
-│   │   │   │   ├── webhooks.py       # Webhook API
-│   │   │   │   └── users.py          # ユーザー管理API
-│   │   │   ├── dependencies/   # 依存性注入
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── auth.py           # 認証・認可
-│   │   │   │   └── database.py       # DB接続
-│   │   │   ├── middleware/     # ミドルウェア
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── logging.py        # ロギング/トレーシング
-│   │   │   │   └── error_handler.py  # 例外ハンドラ
-│   │   │   └── __init__.py
-│   │   └── __init__.py
+│   │   └── v1/                 # APIバージョン1
+│   │       ├── dependencies/   # 依存性注入
+│   │       │   └── auth.py     # JWT認証・認可（HTTPBearer401含む）
+│   │       └── endpoints/      # エンドポイント定義
+│   │           └── measurements.py    # 測定データAPI（認証付き）
 │   ├── core/                   # アプリケーション設定・共通機能
 │   │   ├── __init__.py
-│   │   ├── config.py           # 環境設定管理
-│   │   ├── security.py         # セキュリティユーティリティ
-│   │   ├── exceptions.py       # カスタム例外定義
-│   │   └── logging.py          # ロギング設定
+│   │   ├── logging.py          # ロギング設定（structlog）
+│   │   └── security.py         # セキュリティ設定（JWT設定）
 │   ├── domain/                 # ビジネスロジック層
-│   │   ├── __init__.py
-│   │   ├── entities/           # ドメインエンティティ（Pydantic）
-│   │   │   ├── __init__.py
-│   │   │   ├── measurement.py
-│   │   │   ├── goal.py
-│   │   │   └── user.py
-│   │   ├── services/           # ドメインサービス
-│   │   │   ├── __init__.py
-│   │   │   ├── measurement_service.py
-│   │   │   ├── goal_service.py
-│   │   │   └── notification_service.py
-│   │   └── ports/              # インターフェース定義
+│   │   └── entities/           # ドメインエンティティ（Pydantic）
 │   │       ├── __init__.py
-│   │       ├── repositories.py       # リポジトリインターフェース
-│   │       └── external_services.py  # 外部サービスインターフェース
-│   ├── infrastructure/         # 技術的実装層
-│   │   ├── __init__.py
-│   │   ├── database/           # データベース関連
-│   │   │   ├── __init__.py
-│   │   │   ├── models.py      # SQLAlchemyモデル
-│   │   │   ├── repositories/  # リポジトリ実装
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── measurement_repository.py
-│   │   │   │   ├── goal_repository.py
-│   │   │   │   └── user_repository.py
-│   │   │   └── migrations/     # Alembicマイグレーション
-│   │   └── adapters/           # 外部サービスアダプター
-│   │       ├── __init__.py
-│   │       ├── s3_adapter.py
-│   │       ├── sqs_adapter.py
-│   │       └── ses_adapter.py
+│   │       ├── measurement.py  # 測定データエンティティ
+│   │       └── user.py         # ユーザーエンティティ（UserInToken）
 │   ├── schemas/                # APIスキーマ（Pydantic）
-│   │   ├── __init__.py
 │   │   ├── requests/           # リクエストスキーマ
-│   │   │   ├── __init__.py
 │   │   │   └── measurement.py
-│   │   ├── responses/          # レスポンススキーマ
-│   │   │   ├── __init__.py
-│   │   │   └── measurement.py
-│   │   └── common.py
+│   │   └── responses/          # レスポンススキーマ
+│   │       └── measurement.py
 │   └── main.py                 # アプリケーションエントリポイント
 ├── tests/                      # テストコード
 │   ├── unit/                   # ユニットテスト
 │   │   ├── __init__.py
 │   │   ├── api/
-│   │   ├── domain/
-│   │   └── infrastructure/
+│   │   │   ├── test_health.py         # ヘルスチェックテスト
+│   │   │   ├── test_measurements_api.py # 測定APIテスト（認証含む）
+│   │   │   └── test_auth.py           # JWT認証テスト
+│   │   ├── core/
+│   │   │   └── test_logging.py        # ロギング設定テスト
+│   │   └── domain/
+│   │       └── test_measurement_entity.py # エンティティテスト
 │   ├── integration/            # 統合テスト
 │   │   ├── __init__.py
-│   │   ├── test_api_integration.py
-│   │   └── test_db_integration.py
-│   ├── e2e/                    # E2Eテスト
-│   │   ├── __init__.py
-│   │   └── test_scenarios.py
-│   ├── performance/            # パフォーマンステスト
-│   │   ├── __init__.py
-│   │   ├── test_mysql_queries.py
-│   │   └── load_test.k6.js
-│   ├── fixtures/               # テストフィクスチャ
-│   │   ├── __init__.py
-│   │   └── factories.py
+│   │   └── test_api_auth_integration.py  # 認証フロー統合テスト
 │   └── conftest.py             # pytest設定
+
+### 将来の拡張予定構成
+
+├── src/
+│   ├── api/v1/
+│   │   ├── endpoints/
+│   │   │   ├── goals.py          # ゴール設定API（Phase 3）
+│   │   │   ├── webhooks.py       # Webhook API（将来）
+│   │   │   └── users.py          # ユーザー管理API（将来）
+│   │   ├── dependencies/
+│   │   │   └── database.py       # DB接続（MVP7）
+│   │   └── middleware/           # ミドルウェア（将来）
+│   │       ├── logging.py        # ロギング/トレーシング
+│   │       └── error_handler.py  # 例外ハンドラ
+│   ├── core/
+│   │   ├── config.py             # 環境設定管理（MVP7）
+│   │   └── exceptions.py         # カスタム例外定義（将来）
+│   ├── domain/
+│   │   ├── entities/
+│   │   │   └── goal.py           # ゴールエンティティ（Phase 3）
+│   │   ├── services/             # ドメインサービス（Phase 2-3）
+│   │   └── ports/                # インターフェース定義（Phase 2-3）
+│   ├── infrastructure/           # 技術的実装層（MVP7以降）
+│   │   ├── database/             # データベース関連
+│   │   └── adapters/             # 外部サービスアダプター（Phase 4）
+│   └── schemas/
+│       └── common.py             # 共通スキーマ（将来）
 ├── scripts/                    # ユーティリティスクリプト
 │   ├── db_init.py
 │   ├── seed_data.py
@@ -173,36 +151,43 @@ healthsync-api/
 
 ### Phase 1: 基本API（Week 1）
 ```
-MVP機能:
-- ヘルスデータの一括登録（POST /v1/measurements/bulk）
-- ユーザー認証（JWT）
-- 構造化ロギング基盤
+実装済みMVP:
+MVP1: ヘルスチェックAPI
+- GET /health エンドポイント
+- ステータス、タイムスタンプ、バージョン情報を返却
 
-TDD手順:
-1. 失敗するテスト作成: tests/unit/api/test_measurements_api.py
-   - 正常なデータ登録（201）
-   - 不正なデータでの422エラー
-   - 一部失敗時の207 Multi-Status
-   - 空配列での400エラー
-   - 大量データ処理（100件）
-2. 最小限のエンドポイント実装（Redフェーズ）
-3. テストをパスする実装（Greenフェーズ）
-   - List[Dict[str, Any]]で生データを受け取る
-   - 個別バリデーション（Pydantic → ドメイン）
-   - エラー収集と詳細レスポンス
-4. リファクタリング & docker-compose.ymlでMySQL 8.0環境構築
-5. 統合テスト追加: tests/integration/test_api_integration.py
+MVP2: 構造化ロギング基盤
+- structlogによるJSON形式のロギング
+- タイムスタンプ、ログレベル、コンテキスト情報の付与
+
+MVP3: Measurementエンティティ定義
+- Pydantic v2によるドメインモデル
+- 10種類のヘルスメトリック（心拍数、血圧、体重等）
+- 値の範囲検証、単位検証、未来日時の拒否
+
+MVP4: 測定データ一括登録API（認証なし）
+- POST /v1/measurements/bulk エンドポイント
+- 2段階バリデーション方式（生データ→Pydantic→ドメイン）
+- 207 Multi-Statusによる部分成功のサポート
+- エラーの詳細情報を含むレスポンス
+
+MVP5: JWT認証基盤
+- src/api/v1/dependencies/auth.py: JWT生成・検証関数
+- src/core/security.py: セキュリティ設定（SECRET_KEY、ALGORITHM）
+- src/domain/entities/user.py: UserInTokenモデル（user_id、email）
+- 有効期限のカスタマイズ対応（デフォルト30分）
+
+MVP6: 認証付きAPI統合
+- 測定データAPIにJWT認証を統合
+- HTTPBearer401クラスで403→401エラーに統一
+- get_current_user依存関数による保護
+- 統合テストでフルフローを検証
 
 実装上の変更点:
-- MVP4では認証なしで実装（JWT認証はMVP5で追加）
-- 2段階バリデーション方式を採用
-- 207 Multi-Statusによる部分成功のサポート
-
-MVP5（JWT認証基盤）の実装:
-- src/api/v1/dependencies/auth.py: JWT生成・検証、Bearer認証
-- src/core/security.py: セキュリティ設定（SECRET_KEY、ALGORITHM）
-- src/domain/entities/user.py: UserInTokenモデル
-- 有効期限のカスタマイズ対応（デフォルト30分）
+- 当初の想定より細かくMVPを分割（1→6）
+- UserInTokenモデルで'sub'ではなく'user_id'フィールドを使用
+- 認証なしの403エラーを401に変換するカスタムHTTPBearerクラスを追加
+- 2段階バリデーション方式で柔軟なエラーハンドリングを実現
 ```
 
 ### Phase 2: データ取得と集計（Week 2）
@@ -813,6 +798,43 @@ MVP4の実装で採用した方式：
 - **ローカル開発**: uv + 仮想環境（高速な開発イテレーション）
 - **データベース**: Docker Compose（MySQLコンテナ）
 - **統合テスト/本番**: 完全Docker化（再現性の確保）
+
+## 16. 実装上の主要な変更点（2025-07-27時点）
+
+### 設計からの変更内容
+
+1. **MVP分割の細分化**
+   - 当初想定: Phase 1で認証含む全機能実装
+   - 実際: MVP1-6に細分化し、段階的に実装
+   - 理由: TDDアプローチの徹底とリスク軽減
+
+2. **ディレクトリ構成の簡素化**
+   - 当初設計: 完全なクリーンアーキテクチャ
+   - 実際: 最小限の構成からスタート
+   - 理由: YAGNIの原則に従い、必要に応じて拡張
+
+3. **認証実装の変更**
+   - HTTPBearer401クラスの追加（403→401変換）
+   - UserInTokenモデルで`user_id`フィールドを使用（`sub`ではなく）
+   - 理由: FastAPIのデフォルト動作との整合性
+
+4. **バリデーション戦略**
+   - 2段階バリデーション方式の採用
+   - 生データ→Pydanticスキーマ→ドメインエンティティ
+   - 理由: 柔軟なエラーハンドリングと部分成功のサポート
+
+### 今後の実装計画
+
+**MVP7: Docker/MySQL統合**
+- MySQLコンテナのセットアップ
+- SQLAlchemyモデルの実装
+- データベース接続管理
+
+**Phase 2以降**
+- データ取得・集計API
+- ゴール機能
+- AWS Lambda統合
+- パフォーマンスチューニング
 
 ### 前提条件
 - Python 3.11+（pyenvで3.11.9推奨）
