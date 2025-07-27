@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: healthsync-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: healthsync
+      MYSQL_USER: healthsync
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/mysql-init:/docker-entrypoint-initdb.d
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_connections=1000
+      - --innodb_buffer_pool_size=1G
+      - --innodb_log_file_size=256M
+      - --slow_query_log=ON
+      - --slow_query_log_file=/var/log/mysql/slow.log
+      - --long_query_time=0.1
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Uncomment for full application deployment
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: healthsync-api
+  #   restart: always
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     DATABASE_URL: mysql+aiomysql://healthsync:password@mysql:3306/healthsync
+  #     APP_ENV: development
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./src:/app/src
+  #   command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  mysql_data:

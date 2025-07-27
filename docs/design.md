@@ -134,8 +134,10 @@ healthsync-api/
 │   └── development/            # 開発ガイド
 ├── .env.example                # 環境変数サンプル
 ├── .gitignore
+├── .python-version            # Python 3.11.9を指定
+├── requirements.txt            # 本番用依存関係（pip freeze形式）
+├── requirements-dev.txt        # 開発用依存関係
 ├── Makefile                    # タスクランナー
-├── pyproject.toml              # Poetry設定（依存管理・ツール設定統合）
 └── README.md
 
 ```
@@ -247,17 +249,29 @@ TDD手順:
 ```
 
 ### テストツールとライブラリ
-```toml
-[tool.poetry.dev-dependencies]
-pytest = "^7.4"
-pytest-asyncio = "^0.21"
-pytest-cov = "^4.1"
-factory-boy = "^3.3"
-freezegun = "^1.2"
-httpx = "^0.25"  # 非同期HTTPクライアント
-testcontainers = "^3.7"
-localstack = "^3.0"
-mutmut = "^2.4"  # Mutation testing
+
+**requirements-dev.txt:**
+```
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+factory-boy==3.3.0
+freezegun==1.2.2
+httpx==0.25.2
+testcontainers==3.7.1
+localstack==3.0.0
+mutmut==2.4.4
+
+# Linting and formatting
+ruff==0.1.9
+black==23.12.1
+mypy==1.7.1
+isort==5.13.2
+
+# Development tools
+ipython==8.19.0
+watchdog==3.0.0
 ```
 
 ### テスト実行コマンド
@@ -367,36 +381,50 @@ feature/* → develop → staging → main
 - 最大行長: 88文字（Black準拠）
 - インポート順序: isortで自動整形
 
-### Poetry設定例
+### 依存関係管理（uv使用）
+
+**requirements.txt（本番用）:**
+```
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy[asyncio]==2.0.23
+alembic==1.12.1
+pydantic==2.5.2
+pydantic-settings==2.1.0
+boto3==1.34.14
+structlog==23.2.0
+httpx==0.25.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+aiomysql==0.2.0
+pymysql==1.1.0
+```
+
+**pyproject.toml（ツール設定のみ）:**
 ```toml
-[tool.poetry]
-name = "healthsync-api"
-version = "0.1.0"
-python = "^3.11"
-
-[tool.poetry.dependencies]
-fastapi = "^0.104"
-uvicorn = {extras = ["standard"], version = "^0.24"}
-sqlalchemy = {extras = ["asyncio"], version = "^2.0"}
-alembic = "^1.12"
-pydantic = "^2.5"
-pydantic-settings = "^2.1"
-boto3 = "^1.34"
-structlog = "^23.2"
-httpx = "^0.25"
-python-jose = {extras = ["cryptography"], version = "^3.3"}
-passlib = {extras = ["bcrypt"], version = "^1.7"}
-python-multipart = "^0.0.6"
-aiomysql = "^0.2.0"
-
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "I", "N", "W", "B", "C90", "UP"]
 ignore = ["E501"]
+target-version = "py311"
 
 [tool.mypy]
 strict = true
 python_version = "3.11"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
 ```
 
 ### ブランチ戦略
@@ -563,7 +591,76 @@ result = await session.execute(
 )
 ```
 
-## 12. 例外処理とエラーハンドリング
+## 12. ドメインエンティティ詳細仕様
+
+### Measurementエンティティ
+
+#### MetricType（測定タイプ）
+```python
+class MetricType(str, Enum):
+    HEART_RATE = "heart_rate"                    # 心拍数
+    BLOOD_PRESSURE_SYSTOLIC = "blood_pressure_systolic"   # 収縮期血圧
+    BLOOD_PRESSURE_DIASTOLIC = "blood_pressure_diastolic" # 拡張期血圧
+    BODY_WEIGHT = "body_weight"                  # 体重
+    BODY_TEMPERATURE = "body_temperature"        # 体温
+    BLOOD_GLUCOSE = "blood_glucose"              # 血糖値
+    OXYGEN_SATURATION = "oxygen_saturation"      # 血中酸素飽和度
+    STEPS = "steps"                              # 歩数
+    DISTANCE = "distance"                        # 移動距離
+    CALORIES_BURNED = "calories_burned"          # 消費カロリー
+```
+
+#### バリデーションルール
+
+**値の範囲（VALUE_RANGES）:**
+| メトリックタイプ | 最小値 | 最大値 | 単位例 |
+|-----------------|-------|--------|--------|
+| HEART_RATE | 20.0 | 250.0 | bpm |
+| BLOOD_PRESSURE_SYSTOLIC | 50.0 | 250.0 | mmHg |
+| BLOOD_PRESSURE_DIASTOLIC | 30.0 | 150.0 | mmHg |
+| BODY_WEIGHT | 0.1 | 500.0 | kg, lb |
+| BODY_TEMPERATURE | 25.0 | 45.0 | °C, °F |
+| BLOOD_GLUCOSE | 20.0 | 600.0 | mg/dL, mmol/L |
+| OXYGEN_SATURATION | 50.0 | 100.0 | % |
+| STEPS | 0.0 | 100000.0 | steps |
+| DISTANCE | 0.0 | 1000000.0 | m, km, mi |
+| CALORIES_BURNED | 0.0 | 10000.0 | kcal, cal |
+
+**有効な単位（VALID_UNITS）:**
+```python
+VALID_UNITS = {
+    MetricType.HEART_RATE: {"bpm", "beats/min"},
+    MetricType.BLOOD_PRESSURE_SYSTOLIC: {"mmHg"},
+    MetricType.BLOOD_PRESSURE_DIASTOLIC: {"mmHg"},
+    MetricType.BODY_WEIGHT: {"kg", "lb"},
+    MetricType.BODY_TEMPERATURE: {"°C", "°F"},
+    MetricType.BLOOD_GLUCOSE: {"mg/dL", "mmol/L"},
+    MetricType.OXYGEN_SATURATION: {"%"},
+    MetricType.STEPS: {"steps"},
+    MetricType.DISTANCE: {"m", "km", "mi"},
+    MetricType.CALORIES_BURNED: {"kcal", "cal"},
+}
+```
+
+#### エンティティフィールド
+```python
+class Measurement(BaseModel):
+    metric_type: MetricType          # 測定タイプ（必須）
+    value: float                     # 測定値（必須、正の数）
+    unit: str                        # 単位（必須、メトリックタイプに応じた検証）
+    measured_at: datetime            # 測定日時（必須、未来の日時は不可）
+    device_id: Optional[str]         # 測定デバイスID
+    metadata: Optional[Dict[str, Any]]  # 追加メタデータ
+    notes: Optional[str]             # メモ
+```
+
+#### 技術的実装
+- Pydantic v2使用（ConfigDict、field_validator、model_validator）
+- JSON出力時のみdatetimeをISO形式にシリアライズ（field_serializer）
+- 厳密な型チェックとバリデーション
+- エラーメッセージの明確化（特に心拍数の範囲エラー）
+
+## 13. 例外処理とエラーハンドリング
 
 ### 共通例外定義
 ```python
@@ -631,13 +728,19 @@ async def error_handler(request: Request, exc: Exception):
     )
 ```
 
-## 13. 開発環境セットアップ
+## 14. 開発環境セットアップ
+
+### 開発環境戦略
+本プロジェクトではハイブリッドアプローチを採用：
+- **ローカル開発**: uv + 仮想環境（高速な開発イテレーション）
+- **データベース**: Docker Compose（MySQLコンテナ）
+- **統合テスト/本番**: 完全Docker化（再現性の確保）
 
 ### 前提条件
-- Python 3.11+
+- Python 3.11+（pyenvで3.11.9推奨）
 - Docker Desktop
 - AWS CLI設定済み
-- Poetry（依存管理）
+- uv（高速パッケージマネージャー）
 
 ### 初期セットアップ
 ```bash
@@ -645,11 +748,17 @@ async def error_handler(request: Request, exc: Exception):
 git clone https://github.com/your-org/healthsync-api.git
 cd healthsync-api
 
-# Poetry インストール
-curl -sSL https://install.python-poetry.org | python3 -
+# uv インストール（まだの場合）
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 依存関係インストール
-poetry install
+# Python 3.11.9 セットアップ（pyenv使用時）
+pyenv install 3.11.9
+pyenv local 3.11.9
+
+# 仮想環境作成と依存関係インストール
+uv venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+uv pip install -r requirements.txt -r requirements-dev.txt
 
 # 環境変数設定
 cp .env.example .env
@@ -659,11 +768,11 @@ cp .env.example .env
 docker-compose up -d mysql
 
 # データベース初期化
-poetry run alembic upgrade head
-poetry run python scripts/seed_data.py
+alembic upgrade head
+python scripts/seed_data.py
 
 # 開発サーバー起動
-poetry run uvicorn src.main:app --reload
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 開発用コマンド（Makefile）
