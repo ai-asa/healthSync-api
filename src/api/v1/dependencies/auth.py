@@ -3,15 +3,33 @@ JWT認証の依存関数
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
 from src.core.security import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from src.domain.entities.user import UserInToken
 
+
+class HTTPBearer401(HTTPBearer):
+    """403の代わりに401を返すカスタムHTTPBearer"""
+    
+    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
+        """認証ヘッダーがない場合やフォーマットが不正な場合に401を返す"""
+        try:
+            return await super().__call__(request)
+        except HTTPException as e:
+            if e.status_code == status.HTTP_403_FORBIDDEN:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            raise
+
+
 # Bearer認証スキーム
-security = HTTPBearer()
+security = HTTPBearer401()
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:

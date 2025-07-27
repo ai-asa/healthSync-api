@@ -5,10 +5,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Body, HTTPException, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from pydantic import ValidationError
 
+from api.v1.dependencies.auth import get_current_user
 from domain.entities.measurement import Measurement
+from domain.entities.user import UserInToken
 from schemas.requests.measurement import MeasurementCreateRequest
 from schemas.responses.measurement import (
     MeasurementBulkCreateResponse,
@@ -24,9 +26,16 @@ measurements_body = Body(..., description="Array of measurement data")
 @router.post("/bulk", response_model=MeasurementBulkCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_measurements_bulk(
     response: Response,
-    measurements_data: list[dict[str, Any]] = measurements_body
+    measurements_data: list[dict[str, Any]] = measurements_body,
+    current_user: UserInToken = Depends(get_current_user)
 ) -> MeasurementBulkCreateResponse:
-    """測定データを一括登録する"""
+    """測定データを一括登録する（認証必須）"""
+
+    # 認証されたユーザー情報をロギング
+    bound_logger = logger.bind(
+        user_id=current_user.user_id,
+        user_email=current_user.email
+    )
 
     # 空配列チェック
     if not measurements_data:
@@ -87,7 +96,7 @@ async def create_measurements_bulk(
             })
 
     # ログ出力
-    logger.info(
+    bound_logger.info(
         "Bulk measurement creation completed",
         total_count=len(measurements_data),
         success_count=len(successful_measurements),
