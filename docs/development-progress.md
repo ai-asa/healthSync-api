@@ -21,7 +21,7 @@
 | MVP2 | 構造化ロギング基盤 | ✅ 完了 | 2025-07-27 |
 | MVP3 | Measurementエンティティ | ✅ 完了 | 2025-07-27 |
 | MVP4 | 測定データ登録API（認証なし） | ✅ 完了 | 2025-07-27 |
-| MVP5 | JWT認証基盤 | 🔲 未着手 | - |
+| MVP5 | JWT認証基盤 | ✅ 完了 | 2025-07-27 |
 | MVP6 | 認証付きAPI統合 | 🔲 未着手 | - |
 | MVP7 | Docker/MySQL統合 | 🔲 未着手 | - |
 
@@ -156,17 +156,33 @@ curl http://localhost:8000/health
 - FastAPIのBody()をモジュールレベル変数に
 - 型注釈の追加（AsyncGenerator、Dict[str, Any]）
 
-### 🔲 MVP5: JWT認証基盤
+### ✅ MVP5: JWT認証基盤
 
-**予定ファイル:**
-- `tests/unit/api/test_auth.py`
-- `src/api/v1/dependencies/auth.py`
+**実装ファイル:**
+- `tests/unit/api/test_auth.py` - JWT認証のテスト（10ケース）
+- `src/api/v1/dependencies/auth.py` - JWT認証の依存関数
+- `src/core/security.py` - セキュリティ設定
+- `src/domain/entities/user.py` - ユーザーエンティティ
 
 **チェックリスト:**
-- [ ] JWT生成・検証
-- [ ] Bearer token認証
-- [ ] 依存性注入
-- [ ] 認証エラー処理
+- [x] JWT生成・検証
+- [x] Bearer token認証
+- [x] 依存性注入
+- [x] 認証エラー処理
+- [x] テスト全パス（10/10）
+- [x] auth.pyカバレッジ 97.22%
+
+**実装内容:**
+- JWTトークンの生成・検証機能
+- Bearer認証スキーム（HTTPBearer）
+- get_current_user依存関数（FastAPIエンドポイント用）
+- get_user_from_token内部関数（テスト用）
+- UserInTokenモデル定義
+- 有効期限のカスタマイズ対応
+
+**技術的対応:**
+- email-validator依存関係の追加
+- Pydantic v2のjson_encoders警告を解消
 
 ### 🔲 MVP6: 認証付きAPI統合
 
@@ -209,6 +225,6 @@ make db-down                   # MySQL停止
 
 ## 次のアクション
 
-1. MVP5: JWT認証基盤の実装
-2. 認証トークンの生成・検証ロジック
-3. Bearer認証スキームの実装
+1. MVP6: 認証付きAPI統合
+2. 測定データAPIに認証を適用
+3. 統合テストの作成

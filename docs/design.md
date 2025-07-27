@@ -197,6 +197,12 @@ TDD手順:
 - MVP4では認証なしで実装（JWT認証はMVP5で追加）
 - 2段階バリデーション方式を採用
 - 207 Multi-Statusによる部分成功のサポート
+
+MVP5（JWT認証基盤）の実装:
+- src/api/v1/dependencies/auth.py: JWT生成・検証、Bearer認証
+- src/core/security.py: セキュリティ設定（SECRET_KEY、ALGORITHM）
+- src/domain/entities/user.py: UserInTokenモデル
+- 有効期限のカスタマイズ対応（デフォルト30分）
 ```
 
 ### Phase 2: データ取得と集計（Week 2）
