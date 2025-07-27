@@ -1,9 +1,13 @@
 """HealthSync API メインアプリケーション"""
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Dict, Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.v1.endpoints import measurements
 from core.logging import configure_logging, get_logger
 
 # 構造化ロギングを設定
@@ -12,7 +16,7 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """アプリケーションのライフサイクル管理"""
     # 起動時
     logger.info("HealthSync API starting up", version="0.1.0")
@@ -37,15 +41,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ルーターを登録
+app.include_router(measurements.router)
+
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, Any]:
     """ヘルスチェックエンドポイント"""
     response = {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "0.1.0",
         "service": "healthsync-api"
     }
     logger.debug("Health check requested", response=response)
     return response
+
