@@ -37,7 +37,15 @@
       "Bash(npx patch-package:*)",
       "Bash(powershell.exe:*)",
       "WebFetch(domain:registry.npmjs.org)",
-      "WebFetch(domain:alphacephei.com)"
+      "WebFetch(domain:alphacephei.com)",
+      "Bash(python -m pytest tests/unit/api/test_health.py -v)",
+      "Bash(touch:*)",
+      "Bash(~/.pyenv/bin/pyenv:*)",
+      "Bash(source:*)",
+      "Bash(pkill:*)",
+      "Bash(pytest:*)",
+      "Bash(timeout:*)",
+      "Bash(PYTHONPATH=src timeout 10 uvicorn src.main:app --host 0.0.0.0 --port 8000)"
     ],
     "deny": []
   }
