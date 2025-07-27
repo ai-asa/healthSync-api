@@ -1,6 +1,7 @@
 """構造化ロギングの設定と管理"""
 import logging
 import sys
+from datetime import UTC
 from typing import Any, Optional
 
 import structlog
@@ -9,20 +10,20 @@ from structlog.types import EventDict, Processor
 
 def add_timestamp(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
     """タイムスタンプをISO形式で追加"""
-    from datetime import datetime, timezone
-    event_dict["timestamp"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    from datetime import datetime
+    event_dict["timestamp"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return event_dict
 
 
 def configure_logging(log_level: str = "INFO") -> None:
     """構造化ロギングを設定
-    
+
     Args:
         log_level: ログレベル (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
     # 既存のハンドラーをクリア
     logging.root.handlers = []
-    
+
     # Python標準ロギングの設定
     logging.basicConfig(
         format="%(message)s",
@@ -30,7 +31,7 @@ def configure_logging(log_level: str = "INFO") -> None:
         level=getattr(logging, log_level.upper()),
         force=True,
     )
-    
+
     # structlogの設定
     processors: list[Processor] = [
         # ログレベルを追加
@@ -52,7 +53,7 @@ def configure_logging(log_level: str = "INFO") -> None:
         # JSON形式で出力
         structlog.processors.JSONRenderer(),
     ]
-    
+
     structlog.configure(
         processors=processors,
         context_class=dict,
@@ -63,10 +64,10 @@ def configure_logging(log_level: str = "INFO") -> None:
 
 def get_logger(name: Optional[str] = None) -> structlog.stdlib.BoundLogger:
     """構造化ロガーを取得
-    
+
     Args:
         name: ロガー名（省略時は呼び出し元のモジュール名）
-    
+
     Returns:
         構造化ロガーインスタンス
     """

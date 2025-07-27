@@ -179,14 +179,24 @@ MVP機能:
 - 構造化ロギング基盤
 
 TDD手順:
-1. 失敗するテスト作成: tests/unit/api/test_measurements.py
-   - 認証なしでの401エラー
+1. 失敗するテスト作成: tests/unit/api/test_measurements_api.py
+   - 正常なデータ登録（201）
    - 不正なデータでの422エラー
-   - 正常なデータ登録
+   - 一部失敗時の207 Multi-Status
+   - 空配列での400エラー
+   - 大量データ処理（100件）
 2. 最小限のエンドポイント実装（Redフェーズ）
 3. テストをパスする実装（Greenフェーズ）
+   - List[Dict[str, Any]]で生データを受け取る
+   - 個別バリデーション（Pydantic → ドメイン）
+   - エラー収集と詳細レスポンス
 4. リファクタリング & docker-compose.ymlでMySQL 8.0環境構築
 5. 統合テスト追加: tests/integration/test_api_integration.py
+
+実装上の変更点:
+- MVP4では認証なしで実装（JWT認証はMVP5で追加）
+- 2段階バリデーション方式を採用
+- 207 Multi-Statusによる部分成功のサポート
 ```
 
 ### Phase 2: データ取得と集計（Week 2）
@@ -728,7 +738,69 @@ async def error_handler(request: Request, exc: Exception):
     )
 ```
 
-## 14. 開発環境セットアップ
+## 14. APIバリデーション戦略
+
+### 測定データ一括登録API（/v1/measurements/bulk）
+
+#### 2段階バリデーション方式
+MVP4の実装で採用した方式：
+
+1. **リクエストレベル**: 生のDict配列を受け取る
+   ```python
+   measurements_data: List[Dict[str, Any]] = Body(...)
+   ```
+   - FastAPIの自動バリデーションを回避
+   - すべてのエラーを収集可能
+
+2. **アプリケーションレベル**: 個別にバリデーション
+   - Pydanticモデル（MeasurementCreateRequest）でスキーマ検証
+   - ドメインエンティティ（Measurement）でビジネスルール検証
+
+#### レスポンス戦略
+```python
+# 成功時（201 Created）
+{
+    "success_count": 3,
+    "failed_count": 0,
+    "measurements": [
+        {
+            "id": "uuid",
+            "metric_type": "heart_rate",
+            "value": 72.0,
+            "unit": "bpm",
+            "measured_at": "2025-01-01T12:00:00Z",
+            "created_at": "2025-01-01T12:00:01Z"
+        }
+    ]
+}
+
+# 一部失敗時（207 Multi-Status）
+{
+    "success_count": 2,
+    "failed_count": 1,
+    "measurements": [...],
+    "errors": [
+        {
+            "index": 1,
+            "message": "Heart rate value 300.0 is out of range",
+            "field": "value"
+        }
+    ]
+}
+
+# 全失敗時（422 Unprocessable Entity）
+{
+    "detail": [
+        {
+            "index": 0,
+            "message": "Invalid metric type",
+            "field": "metric_type"
+        }
+    ]
+}
+```
+
+## 15. 開発環境セットアップ
 
 ### 開発環境戦略
 本プロジェクトではハイブリッドアプローチを採用：

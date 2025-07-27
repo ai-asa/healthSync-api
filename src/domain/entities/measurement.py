@@ -1,9 +1,16 @@
 """測定データのドメインエンティティ"""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 
 class MetricType(str, Enum):
@@ -21,7 +28,7 @@ class MetricType(str, Enum):
 
 
 # メトリックタイプごとの有効な単位
-VALID_UNITS: Dict[MetricType, set[str]] = {
+VALID_UNITS: dict[MetricType, set[str]] = {
     MetricType.HEART_RATE: {"bpm", "beats/min"},
     MetricType.BLOOD_PRESSURE_SYSTOLIC: {"mmHg"},
     MetricType.BLOOD_PRESSURE_DIASTOLIC: {"mmHg"},
@@ -35,7 +42,7 @@ VALID_UNITS: Dict[MetricType, set[str]] = {
 }
 
 # メトリックタイプごとの値の範囲
-VALUE_RANGES: Dict[MetricType, tuple[float, float]] = {
+VALUE_RANGES: dict[MetricType, tuple[float, float]] = {
     MetricType.HEART_RATE: (20.0, 250.0),
     MetricType.BLOOD_PRESSURE_SYSTOLIC: (50.0, 250.0),
     MetricType.BLOOD_PRESSURE_DIASTOLIC: (30.0, 150.0),
@@ -51,18 +58,18 @@ VALUE_RANGES: Dict[MetricType, tuple[float, float]] = {
 
 class Measurement(BaseModel):
     """測定データエンティティ"""
-    
+
     metric_type: MetricType = Field(..., description="測定データのタイプ")
     value: float = Field(..., description="測定値")
     unit: str = Field(..., description="単位")
     measured_at: datetime = Field(..., description="測定日時")
     device_id: Optional[str] = Field(None, description="測定デバイスID")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="追加メタデータ")
+    metadata: Optional[dict[str, Any]] = Field(None, description="追加メタデータ")
     notes: Optional[str] = Field(None, description="メモ")
-    
+
     @field_validator("value")
     @classmethod
-    def validate_positive_value(cls, v: float, info) -> float:
+    def validate_positive_value(cls, v: float, info: Any) -> float:
         """値が正であることを確認（一部のメトリックタイプのみ）"""
         if v <= 0:
             # ステップ数やカロリーは0を許可
@@ -70,20 +77,20 @@ class Measurement(BaseModel):
             if metric_type not in [MetricType.STEPS, MetricType.CALORIES_BURNED]:
                 raise ValueError(f"Value must be greater than 0, got {v}")
         return v
-    
+
     @field_validator("measured_at")
     @classmethod
     def validate_not_future(cls, v: datetime) -> datetime:
         """測定日時が未来でないことを確認"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # タイムゾーンがない場合はUTCとして扱う
         if v.tzinfo is None:
-            v = v.replace(tzinfo=timezone.utc)
-        
+            v = v.replace(tzinfo=UTC)
+
         if v > now:
             raise ValueError("Measurement date cannot be in the future")
         return v
-    
+
     @model_validator(mode="after")
     def validate_unit_for_metric_type(self) -> "Measurement":
         """メトリックタイプに対して単位が適切かを確認"""
@@ -94,7 +101,7 @@ class Measurement(BaseModel):
                 f"Valid units are: {', '.join(valid_units)}"
             )
         return self
-    
+
     @model_validator(mode="after")
     def validate_value_range(self) -> "Measurement":
         """メトリックタイプに対して値が適切な範囲内かを確認"""
@@ -113,12 +120,12 @@ class Measurement(BaseModel):
                         f"Expected range: {min_val} to {max_val}"
                     )
         return self
-    
+
     @field_serializer("measured_at", when_used="json")
     def serialize_measured_at(self, measured_at: datetime) -> str:
         """日時をISO形式でシリアライズ（JSON出力時のみ）"""
         return measured_at.isoformat()
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

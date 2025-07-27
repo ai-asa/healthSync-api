@@ -1,7 +1,6 @@
 """Measurementエンティティのユニットテスト"""
 import json
-from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from freezegun import freeze_time
@@ -19,13 +18,13 @@ class TestMeasurementEntity:
             "metric_type": MetricType.HEART_RATE,
             "value": 72.0,
             "unit": "bpm",
-            "measured_at": datetime.now(timezone.utc),
+            "measured_at": datetime.now(UTC),
             "device_id": "Apple Watch Series 8",
             "metadata": {"quality": "high", "activity": "resting"}
         }
-        
+
         measurement = Measurement(**measurement_data)
-        
+
         assert measurement.metric_type == MetricType.HEART_RATE
         assert measurement.value == 72.0
         assert measurement.unit == "bpm"
@@ -52,9 +51,9 @@ class TestMeasurementEntity:
                 metric_type="invalid_type",
                 value=100.0,
                 unit="unknown",
-                measured_at=datetime.now(timezone.utc)
+                measured_at=datetime.now(UTC)
             )
-        
+
         errors = exc_info.value.errors()
         assert any(error["loc"] == ("metric_type",) for error in errors)
 
@@ -66,9 +65,9 @@ class TestMeasurementEntity:
                 metric_type=MetricType.HEART_RATE,
                 value=-10.0,
                 unit="bpm",
-                measured_at=datetime.now(timezone.utc)
+                measured_at=datetime.now(UTC)
             )
-        
+
         errors = exc_info.value.errors()
         assert any("greater than 0" in str(error) for error in errors)
 
@@ -80,17 +79,17 @@ class TestMeasurementEntity:
                 metric_type=MetricType.HEART_RATE,
                 value=300.0,  # 異常に高い心拍数
                 unit="bpm",
-                measured_at=datetime.now(timezone.utc)
+                measured_at=datetime.now(UTC)
             )
-        
+
         errors = exc_info.value.errors()
         assert any("heart rate" in str(error).lower() for error in errors)
 
     @freeze_time("2024-01-01 12:00:00")
     def test_future_date_validation(self):
         """未来の日時が拒否されることを確認"""
-        future_date = datetime.now(timezone.utc) + timedelta(days=1)
-        
+        future_date = datetime.now(UTC) + timedelta(days=1)
+
         with pytest.raises(ValidationError) as exc_info:
             Measurement(
                 metric_type=MetricType.HEART_RATE,
@@ -98,7 +97,7 @@ class TestMeasurementEntity:
                 unit="bpm",
                 measured_at=future_date
             )
-        
+
         errors = exc_info.value.errors()
         assert any("future" in str(error).lower() for error in errors)
 
@@ -110,15 +109,15 @@ class TestMeasurementEntity:
                 metric_type=MetricType.HEART_RATE,
                 value=72.0,
                 unit="kg",  # 不適切な単位
-                measured_at=datetime.now(timezone.utc)
+                measured_at=datetime.now(UTC)
             )
-        
+
         errors = exc_info.value.errors()
         assert any("unit" in str(error).lower() for error in errors)
 
     def test_measurement_to_dict(self):
         """Measurementがdictに変換できることを確認"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         measurement = Measurement(
             metric_type=MetricType.BODY_WEIGHT,
             value=70.5,
@@ -126,9 +125,9 @@ class TestMeasurementEntity:
             measured_at=now,
             device_id="Withings Scale"
         )
-        
+
         data = measurement.model_dump()
-        
+
         assert data["metric_type"] == "body_weight"
         assert data["value"] == 70.5
         assert data["unit"] == "kg"
@@ -138,17 +137,17 @@ class TestMeasurementEntity:
 
     def test_measurement_json_serialization(self):
         """MeasurementがJSONにシリアライズできることを確認"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         measurement = Measurement(
             metric_type=MetricType.BLOOD_GLUCOSE,
             value=95.0,
             unit="mg/dL",
             measured_at=now
         )
-        
+
         json_data = measurement.model_dump_json()
         parsed_data = json.loads(json_data)
-        
+
         assert parsed_data["metric_type"] == "blood_glucose"
         assert parsed_data["value"] == 95.0
         assert parsed_data["unit"] == "mg/dL"
@@ -163,9 +162,9 @@ class TestMeasurementEntity:
             "unit": "%",
             "measured_at": "2024-01-01T12:00:00Z"
         }
-        
+
         measurement = Measurement.model_validate(data)
-        
+
         assert measurement.metric_type == MetricType.OXYGEN_SATURATION
         assert measurement.value == 98.0
         assert measurement.unit == "%"
@@ -177,9 +176,9 @@ class TestMeasurementEntity:
             metric_type=MetricType.BODY_TEMPERATURE,
             value=36.67,  # 小数点以下2桁
             unit="°C",
-            measured_at=datetime.now(timezone.utc)
+            measured_at=datetime.now(UTC)
         )
-        
+
         # 精度が保持されることを確認
         assert measurement.value == 36.67
         assert str(measurement.value) == "36.67"
@@ -191,9 +190,9 @@ class TestMeasurementEntity:
             metric_type=MetricType.STEPS,
             value=10000,
             unit="steps",
-            measured_at=datetime.now(timezone.utc)
+            measured_at=datetime.now(UTC)
         )
-        
+
         assert measurement.device_id is None
         assert measurement.metadata is None
         assert measurement.notes is None
@@ -204,8 +203,8 @@ class TestMeasurementEntity:
             metric_type=MetricType.BLOOD_PRESSURE_SYSTOLIC,
             value=120,
             unit="mmHg",
-            measured_at=datetime.now(timezone.utc),
+            measured_at=datetime.now(UTC),
             notes="朝食前の測定"
         )
-        
+
         assert measurement.notes == "朝食前の測定"

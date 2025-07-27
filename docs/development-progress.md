@@ -20,7 +20,7 @@
 | MVP1 | ヘルスチェックAPI | ✅ 完了 | 2025-07-27 |
 | MVP2 | 構造化ロギング基盤 | ✅ 完了 | 2025-07-27 |
 | MVP3 | Measurementエンティティ | ✅ 完了 | 2025-07-27 |
-| MVP4 | 測定データ登録API（認証なし） | 🔲 未着手 | - |
+| MVP4 | 測定データ登録API（認証なし） | ✅ 完了 | 2025-07-27 |
 | MVP5 | JWT認証基盤 | 🔲 未着手 | - |
 | MVP6 | 認証付きAPI統合 | 🔲 未着手 | - |
 | MVP7 | Docker/MySQL統合 | 🔲 未着手 | - |
@@ -128,18 +128,33 @@ curl http://localhost:8000/health
 - Pydantic v2の非推奨警告を解消
 - field_serializerでJSON出力時のみISO形式に変換
 
-### 🔲 MVP4: 測定データ登録エンドポイント（認証なし）
+### ✅ MVP4: 測定データ登録API（認証なし）
 
-**予定ファイル:**
-- `tests/unit/api/test_measurements_api.py`
-- `src/api/v1/endpoints/measurements.py`
+**実装ファイル:**
+- `tests/unit/api/test_measurements_api.py` - APIエンドポイントのテスト（7ケース）
+- `src/api/v1/endpoints/measurements.py` - エンドポイント実装
+- `src/schemas/requests/measurement.py` - リクエストスキーマ
+- `src/schemas/responses/measurement.py` - レスポンススキーマ
 
 **チェックリスト:**
-- [ ] POST /v1/measurements/bulk
-- [ ] リクエスト/レスポンススキーマ
-- [ ] バリデーション
-- [ ] エラーハンドリング
-- [ ] モックリポジトリ
+- [x] POST /v1/measurements/bulk エンドポイント
+- [x] リクエスト/レスポンススキーマ定義
+- [x] 個別バリデーション（Pydantic + ドメイン）
+- [x] エラーハンドリング（207 Multi-Status対応）
+- [x] 大量データ処理（100件テスト）
+- [x] テスト全パス（7/7）
+- [x] カバレッジ 92.65%
+
+**実装内容:**
+- 生のdict配列を受け取り、個別にバリデーション
+- 一部失敗時は207 Multi-Statusを返す
+- o3モデル支援でバリデーション問題を解決
+- 成功/失敗の件数とエラー詳細を返却
+
+**技術的対応:**
+- openai-o3によるバリデーションエラー処理の改善
+- FastAPIのBody()をモジュールレベル変数に
+- 型注釈の追加（AsyncGenerator、Dict[str, Any]）
 
 ### 🔲 MVP5: JWT認証基盤
 
@@ -194,6 +209,6 @@ make db-down                   # MySQL停止
 
 ## 次のアクション
 
-1. MVP3: Measurementエンティティ定義の実装
-2. ドメインモデルの設計確認
-3. バリデーションルールの決定
+1. MVP5: JWT認証基盤の実装
+2. 認証トークンの生成・検証ロジック
+3. Bearer認証スキームの実装
